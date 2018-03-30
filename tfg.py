@@ -12,10 +12,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import GridSearchCV
+from sklearn.externals import joblib
+from sklearn.decomposition import PCA
 
 def csv(csv_file):
     pd_films = pd.read_csv(csv_file,sep = ',',header = 0)
@@ -108,9 +112,40 @@ def metrics(matrix):
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.25, random_state=0)
     my_scaler = StandardScaler()
     X_train_scaled = my_scaler.fit(X_train)
-    X_test_scaled = my_scaler.transform(X_test)
+    X_train_norm= my_scaler.transform(X_train)
+    X_train_norm_sin_pca = X_train_norm.copy()
+    my_pca = PCA()
+    X_train_norm_pca = my_pca.fit(X_train_norm)
+    X_train_norm_con_pca = my_pca.transform(X_train)
+    # Regresión lineal sin PCA
+    regression(X_train_norm_sin_pca,y_train,X_test,y_test,my_scaler)
+    # Regresión lineal con PCA
+    regression(X_train_norm_con_pca,y_train,X_test,y_test,my_scaler)
+    
+def  neuronalNetwork(matrix):
+    Y = matrix.loc[0:500,:]
+    x,y = getXAndY(Y)
+    x = x.as_matrix()
+    y = y.as_matrix()
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size= 0.25,random_state=0)
+    tuning_param = {'hidden_layer_sizes':[[3,2],[2,3],[4,4,4],[3,3,3,3]],'activation':['relu'], 'solver':['adam'],'alpha':np.logspace(-4,4,30)}
+    mlp = MLPRegressor()
+    grid = GridSearchCV(mlp,param_grid = tuning_param, cv = 5,n_jobs = -1,verbose = 3)
+    grid.fit(X_train,y_train)
+    #joblib.dump(grid, 'modelo2.pkl')
+
+def regression(X_train_norm_sin_pca,y_train,X_test,y_test,my_scaler):
+    rl= LinearRegression()
+    rl.fit(X_train_norm_sin_pca,y_train)
+    y_pred_training = rl.predict(X_train_norm_sin_pca)
+    rmse_training = np.sqrt(mean_squared_error(y_train,y_pred_training))
+    X_test_norm_sin_pca = my_scaler.transform(X_test)
+    y_pred = rl.predict(X_test_norm_sin_pca)
+    rmse_test= np.sqrt(mean_squared_error(y_test,y_pred))
+
     
 if __name__ == '__main__':
     matrix = csv('movie_metadata.csv')
     result = prepocesingData(matrix)
     metrics(result)
+    neuronalNetwork(result)
