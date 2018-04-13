@@ -55,9 +55,11 @@ def getDummiesG(pd_films_no_numeric,pd_films_sin_nan,list_genres,ins):
     contador = 0
     pd_films_no_numeric.insert(1,'genres',pd_films_sin_nan['genres'])
     for list_gen in pd_films_no_numeric['genres']:
+        print(contador,'de',len(pd_films_no_numeric))
         genero=[]
         genero = list_gen.split('|')
         for gen in list_genres:
+            
             pd_films_no_numeric.loc[contador,gen]=1
         contador = contador + 1
     pd_films_no_numeric= pd_films_no_numeric.drop('genres', 1)
@@ -70,6 +72,7 @@ def buildingMatrixNoNumeric(pd_films_sin_nan):
     pd_films_no_numeric = pd.DataFrame(data)
     i=0
     for col in columns_no_numeric_scpecific:
+        print(i,'de',len(columns_no_numeric_scpecific))
         var = columns[col]
         pd_films_no_numeric.insert(i,var,pd_films_sin_nan[var])
         i=i+1
@@ -96,7 +99,7 @@ def prepocesingData(pd_films_csv):
     pd_films_numeric = pd_films.select_dtypes(include=['float64','int64'])
     matrix_no_numeric = buildingMatrixNoNumeric(pd_films)
     result = pd.concat([matrix_no_numeric,pd_films_numeric],axis=1)
-    result= result.dropna(how='any')
+    result = result.dropna(how='any')
     return result    
 
 def getXAndY(matrix):
@@ -105,10 +108,7 @@ def getXAndY(matrix):
     y = matrix['imdb_score']
     return x,y
     
-def metrics(matrix):
-    x,y = getXAndY(matrix)
-    x = x.as_matrix()
-    y = y.as_matrix()
+def metrics(x,y):
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.25, random_state=0)
     my_scaler = StandardScaler()
     X_train_scaled = my_scaler.fit(X_train)
@@ -122,17 +122,22 @@ def metrics(matrix):
     # Regresión lineal con PCA
     regression(X_train_norm_con_pca,y_train,X_test,y_test,my_scaler)
     
-def  neuronalNetwork(matrix):
-    Y = matrix.loc[0:500,:]
-    x,y = getXAndY(Y)
-    x = x.as_matrix()
-    y = y.as_matrix()
+def  neuronalNetwork(x,y):
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size= 0.25,random_state=0)
-    tuning_param = {'hidden_layer_sizes':[[3,2],[2,3],[4,4,4],[3,3,3,3]],'activation':['relu'], 'solver':['adam'],'alpha':np.logspace(-4,4,30)}
-    mlp = MLPRegressor()
-    grid = GridSearchCV(mlp,param_grid = tuning_param, cv = 5,n_jobs = -1,verbose = 3)
-    grid.fit(X_train,y_train)
+    #code to modify
+    D = matrix.shape[1]
+    
+    #preprocessing (remember sin PCA)
+    
+    mlr = MLPRegressor((int(D/4.),int(D/16.),int(D/64)),activation = 'relu',alpha = 0,verbose = 4,tol = 0,learning_rate = 'adaptive',solver = 'sgd',momentum = 0.4,max_iter = 600)
+    
+    mlr.fit()
+    
     #joblib.dump(grid, 'modelo2.pkl')
+    y_hat = mlr.predict(x_scaled)
+    
+    rmse_train = np.sqrt(np.mean((y_train-y_hat)**2))
+    rmse_test = np.sqrt(np.mean((y_test-y_hat)**2))
 
 def regression(X_train_norm_sin_pca,y_train,X_test,y_test,my_scaler):
     rl= LinearRegression()
@@ -145,7 +150,22 @@ def regression(X_train_norm_sin_pca,y_train,X_test,y_test,my_scaler):
 
     
 if __name__ == '__main__':
-    matrix = csv('movie_metadata.csv')
-    result = prepocesingData(matrix)
-    metrics(result)
+    
+    read_prepro_data = False
+    
+    if read_prepro_data:
+        matrix = csv('movie_metadata.csv')
+        result = prepocesingData(matrix)
+        X,y = getXAndY(result)
+        X = X.as_matrix()
+        y = y.as_matrix()
+        print("saving matrix")
+        np.save('numpy_cine_X',X)
+        np.save('numpy_cine_y',y)
+    else:
+        x = np.load('numpy_cine_X.npy')
+        y = np.load('numpy_cine_y.npy')
+    
+    
+    #metrics(result)
     neuronalNetwork(result)
